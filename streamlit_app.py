@@ -19,13 +19,13 @@ import pandas as pd
 from best_model.preprocessing import get_location, safe_float_input
 
 # Load encoder for all features (magType, location)
-with open("best_model\ordinal_encoder.pkl", "rb") as f:
+with open("best_model/ordinal_encoder.pkl", "rb") as f:
     encoder = pickle.load(f)
 
 # Load model XGBoost
 @st.cache_resource
 def load_model():
-    with open('best_model\XGB3_model.pkl', 'rb') as file:
+    with open('best_model/XGB3_model.pkl', 'rb') as file:
         model = pickle.load(file)
     return model
 
