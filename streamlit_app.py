@@ -53,7 +53,12 @@ if halaman == "Pengembangan Model":
             st.session_state['X_test'] = X_test
             st.session_state['y_train'] = y_train
             st.session_state['y_test'] = y_test
-
+            st.session_state['columns'] = X_train.columns.tolist()
+            st.session_state['feature_cols'] = X_train.columns.tolist()  # Semua kolom sebagai fitur
+            if y_train.name:
+                st.session_state['target_col'] = y_train.name  # Jika y_train punya nama kolom
+            else:
+                st.session_state['target_col'] = "tsunami"  # Default nama
             st.success("✅ Data berhasil dimuat ke session_state.")
             st.dataframe(st.session_state['X_train'].head())
 
