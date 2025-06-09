@@ -8,11 +8,6 @@ requests
 python-dotenv
 seaborn
 bayesian-optimization
-imblearn
+imbalanced-learn
 pydeck
-pickle
-os
-json
-tempfile
-time
 numpy
