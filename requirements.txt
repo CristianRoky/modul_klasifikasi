@@ -8,3 +8,11 @@ requests
 python-dotenv
 seaborn
 bayesian-optimization
+imblearn
+pydeck
+pickle
+os
+json
+tempfile
+time
+numpy
