@@ -7,3 +7,4 @@ opencage
 requests
 python-dotenv
 seaborn
+bayesian-optimization
