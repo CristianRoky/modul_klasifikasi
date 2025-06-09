@@ -1,13 +1,13 @@
 streamlit
 pandas
 matplotlib
-scikit-learn
+scikit-learn==1.5.2
+imbalanced-learn==0.13.0
 xgboost
 opencage
 requests
 python-dotenv
 seaborn
 bayesian-optimization
-imbalanced-learn
 pydeck
 numpy
