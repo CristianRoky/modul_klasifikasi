@@ -1,0 +1,9 @@
+streamlit
+pandas
+matplotlib
+scikit-learn
+xgboost
+opencage-geocoder
+requests
+python-dotenv
+seaborn
