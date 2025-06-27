@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-def eda_summary(eda_data, label_column=None, save_dir="eda_output"):
+def eda_summary(eda_data, label_column=None, y_train=None, save_dir="eda_output"):
     os.makedirs(save_dir, exist_ok=True)
 
     results = {}
@@ -48,12 +48,11 @@ def eda_summary(eda_data, label_column=None, save_dir="eda_output"):
     results['outliers_boxplot'] = outlier_path
 
     # 3. Distribusi Kelas
-    if label_column and label_column in eda_data.columns:
-        class_counts = eda_data[label_column].value_counts()
+    if y_train is not None:
+        class_counts = y_train.value_counts()
         results['class_counts'] = class_counts.to_dict()
-
         plt.figure(figsize=(6, 4))
-        sns.countplot(x=eda_data[label_column])
+        sns.countplot(x=y_train)
         plt.title("Distribusi Kelas")
         dist_path = os.path.join(save_dir, "distribusi_kelas.png")
         plt.savefig(dist_path, dpi=300)
@@ -62,6 +61,7 @@ def eda_summary(eda_data, label_column=None, save_dir="eda_output"):
     else:
         results['class_counts'] = None
         results['distribusi_kelas'] = None
+        
 
     # 4. Korelasi Numerik
     if len(numeric_cols) >= 2:

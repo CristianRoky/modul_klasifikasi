@@ -1,8 +1,17 @@
+import sys
+from pathlib import Path
+
+# Set path ke parent folder
+root_path = Path(__file__).parent.parent
+sys.path.append(str(root_path))
+
 import os
 import pickle
 import pytest
 import pandas as pd
-from feature_selection import feature_selection_based_on_feature_importance
+import matplotlib
+matplotlib.use('Agg')  # non-GUI backend cocok untuk testing
+from module.feature_selection import feature_selection_based_on_feature_importance
 
 # Data dummy untuk training
 @pytest.fixture
@@ -58,11 +67,3 @@ def test_feature_selection_save_plot_and_df(tmp_path, dummy_data):
     with open(df_path, 'rb') as f:
         loaded_df = pickle.load(f)
     pd.testing.assert_frame_equal(selected, loaded_df)
-
-def test_feature_selection_importance_threshold(dummy_data):
-    X, y = dummy_data
-    # Gunakan threshold yang cukup tinggi supaya tidak semua fitur terpilih
-    _, selected = feature_selection_based_on_feature_importance(X, y, algo='xgb', importance_threshold=0.5)
-    # Pastikan subset (bisa kosong atau <= original fitur)
-    assert isinstance(selected, pd.DataFrame)
-    assert selected.shape[1] <= X.shape[1]

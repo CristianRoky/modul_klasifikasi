@@ -15,14 +15,14 @@ y = df['tsunami']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,
                                                     random_state=42, stratify=y)
 
-from source_counter import count_sources
+from module.source_counter import count_sources
 
 # Proses fitur sumber
 X_train = count_sources(X_train, column_name='sources')
 X_test = count_sources(X_test, column_name='sources')
 
 import pandas as pd
-from geocoding import create_location
+from module.geocoding import create_location
 
 X_train = create_location(
     X_train,
@@ -35,7 +35,7 @@ X_train = create_location(
 )
 
 
-from encoding import encode
+from module.encoding import encode
 
 # Lakukan encoding dan simpan encoder-nya
 X_train_enc, X_test_enc = encode(
@@ -48,7 +48,7 @@ X_train_enc, X_test_enc = encode(
     save_encoded=True
 )
 
-from feature_selection import feature_selection_based_on_feature_importance
+from module.feature_selection import feature_selection_based_on_feature_importance
 
 model, X_train = feature_selection_based_on_feature_importance(
     X_train, y_train,

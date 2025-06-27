@@ -6,11 +6,11 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.metrics import make_scorer, f1_score
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
-from sklearn.preprocessing import RobustScaler, StandardScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from imblearn.pipeline import Pipeline
-from imblearn.combine import SMOTEENN, SMOTETomek
+from imblearn.combine import SMOTEENN
 import pandas as pd
 
 def build_numeric_transformer(scaler=None, imputer_strategy=None):
@@ -19,8 +19,6 @@ def build_numeric_transformer(scaler=None, imputer_strategy=None):
         steps.append(('imputer', SimpleImputer(strategy=imputer_strategy)))
     if scaler == "robust":
         steps.append(('scaler', RobustScaler()))
-    elif scaler == "standard":
-        steps.append(('scaler', StandardScaler()))
     return Pipeline(steps=steps) if steps else 'passthrough'
 
 def tune_model(
@@ -51,8 +49,6 @@ def tune_model(
 
     if resampler == "smoteenn":
         resampler_obj = SMOTEENN(random_state=random_state)
-    elif resampler == "smotetomek":
-        resampler_obj = SMOTETomek(random_state=random_state)
     else:
         resampler_obj = None
 
@@ -65,7 +61,7 @@ def tune_model(
                 min_samples_split=int(params['min_samples_split']),
                 min_samples_leaf=int(params['min_samples_leaf']),
                 random_state=random_state,
-                verbose=0
+                verbose=2
             )
         elif algo == "xgb":
             return XGBClassifier(
@@ -75,8 +71,7 @@ def tune_model(
                 n_estimators=int(params['n_estimators']),
                 eval_metric='logloss',
                 random_state=random_state,
-                verbosity=0,
-                use_label_encoder=False
+                verbosity=2
             )
                 
     # Fungsi evaluasi BO

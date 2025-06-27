@@ -2,39 +2,27 @@ import streamlit as st
 from sklearn.model_selection import train_test_split
 import pandas as pd
 
-from source_counter import count_sources
-from geocoding import create_location
-from encoding import encode
-from feature_selection import feature_selection_based_on_feature_importance
-from hyperparameter_tuning import tune_model
-from build_model import build_model
-from validation import validate_model
-from test import evaluate_model
+from module.source_counter import count_sources
+from module.geocoding import create_location
+from module.encoding import encode
+from module.feature_selection import feature_selection_based_on_feature_importance
+from module.hyperparameter_tuning import tune_model
+from module.build_model import build_model
+from module.validation import validate_model
+from module.test import evaluate_model
 
 import pydeck as pdk
 import streamlit as st
 import pickle
 import numpy as np
 import pandas as pd
-from best_model.preprocessing import get_location, safe_float_input
+import io
+import json
+import os
+import tempfile
 
-# Load encoder for all features (magType, location)
-with open("best_model\ordinal_encoder.pkl", "rb") as f:
-    encoder = pickle.load(f)
-
-# Load model XGBoost
-@st.cache_resource
-def load_model():
-    with open('best_model\XGB3_model.pkl', 'rb') as file:
-        model = pickle.load(file)
-    return model
-
-model = load_model()
-
-# UI input
-
-halaman = st.sidebar.radio("Navigasi", ["Pengembangan Model","Beranda", "Panduan"])
-if halaman == "Pengembangan Model":
+halaman = st.sidebar.radio("Navigasi", ["Modul Pengembangan Model", "Panduan"])
+if halaman == "Modul Pengembangan Model":
     st.title("Aplikasi Analisis & Prediksi Modular")
 
     # ========================== STEP 1: Upload File ==========================
@@ -53,7 +41,12 @@ if halaman == "Pengembangan Model":
             st.session_state['X_test'] = X_test
             st.session_state['y_train'] = y_train
             st.session_state['y_test'] = y_test
-
+            st.session_state['columns'] = X_train.columns.tolist()
+            st.session_state['feature_cols'] = X_train.columns.tolist()  # Semua kolom sebagai fitur
+            if y_train.name:
+                st.session_state['target_col'] = y_train.name  # Jika y_train punya nama kolom
+            else:
+                st.session_state['target_col'] = "tsunami"  # Default nama
             st.success("✅ Data berhasil dimuat ke session_state.")
             st.dataframe(st.session_state['X_train'].head())
 
@@ -94,23 +87,26 @@ if halaman == "Pengembangan Model":
 
     # Modul lanjutan akan berjalan hanya jika data sudah tersedia
     if 'X_train' in st.session_state and 'X_test' in st.session_state:
-        st.subheader("Modul lanjutan")
-    if st.checkbox("Modul Exploratory Data Analysis"):
-        from exploratory_data_analysis import eda_summary
+        st.subheader("Modul Pengembangan Model Klasifikasi")
+    if st.checkbox("Modul Eksplorasi Data"):
+        from module.exploratory_data_analysis import eda_summary
         import os
         import pandas as pd
 
         X_train = st.session_state['X_train']
         X_test = st.session_state['X_test']
+        y_train = st.session_state['y_train']
+        y_test = st.session_state['y_test']
         target_col = st.session_state['target_col']
         combined_data = pd.concat([X_train, X_test], axis=0)
+        combined_y_data = pd.concat([y_train, y_test], axis=0)
         save_dir = "eda_output"
 
         if st.button("Jalankan EDA"):
             with st.spinner("Menjalankan EDA..."):
-                results = eda_summary(combined_data, label_column=target_col, save_dir=save_dir)
+                results = eda_summary(combined_data, label_column=target_col, y_train=combined_y_data,save_dir=save_dir)
 
-                st.subheader("📥 Unduh Gambar Visualisasi")
+                st.subheader("Visualisasi Data")
 
                 # List file gambar yang mungkin ada berdasarkan keys dari results
                 image_files = [
@@ -203,8 +199,8 @@ if halaman == "Pengembangan Model":
             else:
                 st.error("Kolom tidak ditemukan dalam X_train.")
 
-    if st.checkbox("Gunakan Geocoding"):
-        from geocoding import create_location
+    if st.checkbox("Modul Geocoding"):
+        from module.geocoding import create_location
         st.markdown("### Konfigurasi Geocoding")
         
         X_train = st.session_state['X_train']
@@ -281,9 +277,8 @@ if halaman == "Pengembangan Model":
                     file_name="processed_geocoding_data.pkl"
                 )
 
-    # Fitur Encoding
-    if st.checkbox("Gunakan Encoding"):
-        from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
+    if st.checkbox("Modul Encoding"):
+        from module.encoding import encode  # Pastikan path module benar
         import pickle
 
         X_train = st.session_state.get('X_train')
@@ -300,59 +295,36 @@ if halaman == "Pengembangan Model":
 
             all_columns = st.session_state['original_X_train'].select_dtypes(include=['object', 'string']).columns.tolist()
             selected_columns = st.multiselect("Pilih kolom untuk encoding", all_columns)
-            method = st.selectbox("Pilih metode encoding", ["ordinal", "label"])
-
-            if(st.button("Jalankan encoding")):
+            
+            if st.button("Jalankan encoding"):
                 st.session_state['encoding_done'] = True
             if st.session_state.get('encoding_done',False):
                 if not selected_columns:
                     st.warning("Pilih setidaknya satu kolom.")
                 else:
-                    X_train_enc = X_train.copy()
-                    X_test_enc = X_test.copy()
-                    encoders = {}
-
-                    for col in selected_columns:
-                        if method == "label":
-                            le = LabelEncoder()
-                            X_train_enc[col] = le.fit_transform(X_train_enc[col].astype(str))
-                            X_test_enc[col] = le.transform(X_test_enc[col].astype(str))
-                            encoders[col] = le
-
-                        elif method == "ordinal":
-                            oe = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
-                            X_train_enc[[col]] = oe.fit_transform(X_train_enc[[col]].astype(str))
-                            X_test_enc[[col]] = oe.transform(X_test_enc[[col]].astype(str))
-                            encoders[col] = oe
-
-                        # Pastikan hasilnya numerik
-                        X_train_enc[col] = X_train_enc[col].astype(float)
-                        X_test_enc[col] = X_test_enc[col].astype(float)
-
-                    # Simpan hasil ke session_state
-                    st.session_state['X_train'] = X_train_enc
-                    st.session_state['X_test'] = X_test_enc
-                    st.session_state['encoding_done'] = True
+                    X_train_encoded, X_test_encoded = encode(
+                        X_train=st.session_state['original_X_train'],
+                        columns=selected_columns,
+                        X_test=st.session_state['original_X_test'],
+                        method="ordinal",
+                        prefix="streamlit",
+                        save_path="encoders",  
+                        save_encoded=False,    
+                        save_encoder=True      
+                    )
+                    
+                    st.session_state['X_train'] = X_train_encoded
+                    st.session_state['X_test'] = X_test_encoded
                     st.session_state['encoding_columns'] = selected_columns
-                    st.session_state['encoding_method'] = method
+                    
+                    st.success("Encoding berhasil diterapkan")
+                    st.dataframe(X_train_encoded.head())
+                    st.dataframe(X_test_encoded.head())
 
-                    st.success("Encoding berhasil diterapkan.")
-                    st.dataframe(X_train_enc.head())
-                    st.dataframe(X_test_enc.head())
-
-                    # Unduh encoder per kolom
-                    for col, encoder in encoders.items():
-                        encoder_bytes = pickle.dumps(encoder)
-                        st.download_button(
-                            label=f"Unduh encoder untuk kolom: {col}",
-                            data=encoder_bytes,
-                            file_name=f"{col}_{method}_encoder.pkl"
-                        )
-
-                    # Unduh seluruh data hasil encode
+                    # Unduh data hasil encoding
                     encoded_data = {
-                        'X_train': X_train_enc,
-                        'X_test': X_test_enc,
+                        'X_train': X_train_encoded,
+                        'X_test': X_test_encoded,
                         'y_train': y_train,
                         'y_test': y_test
                     }
@@ -368,8 +340,8 @@ if halaman == "Pengembangan Model":
             if st.session_state.get('encoding_done', False):
                 st.info(f"Encoding sudah diterapkan pada kolom: {st.session_state.get('encoding_columns', [])}")
 
-    if st.checkbox("Gunakan seleksi fitur"):
-        from feature_selection import feature_selection_based_on_feature_importance
+    if st.checkbox("Modul Feature Selection"):
+        from module.feature_selection import feature_selection_based_on_feature_importance
         import tempfile
         import pickle
         import os
@@ -382,8 +354,8 @@ if halaman == "Pengembangan Model":
         if X_train_fs is None or y_train_fs is None:
             st.warning("X_train atau y_train belum tersedia.")
         else:
-            st.write(X_train_fs.dtypes)
             if categorical_cols and not st.session_state.get('encoding_done', False):
+                st.write(X_train_fs.dtypes)
                 st.warning("Terdapat kolom kategori yang belum diencoding: {categorical_cols}. Harap jalankan encoding terlebih dahulu.")
             else:
                 st.markdown("### Konfigurasi Seleksi Fitur Berdasarkan Feature Importance")
@@ -447,13 +419,12 @@ if halaman == "Pengembangan Model":
                         os.unlink(save_path)
                         os.unlink(save_df_path)
 
-    if st.checkbox("Gunakan tuning model"):
-        from hyperparameter_tuning import tune_model
+    if st.checkbox("Modul Hyperparameter Tuning"):
+        from module.hyperparameter_tuning import tune_model
         import json
         X_train = st.session_state.get('X_train')
         y_train = st.session_state.get('y_train')
-        st.write(X_train)
-                    
+        
         all_col = X_train.columns.tolist()
         numeric_features = st.multiselect("Pilih kolom numerik untuk preprocessing", all_col)
         
@@ -461,19 +432,19 @@ if halaman == "Pengembangan Model":
         # --- Imputer strategy ---
         imputer_strategy = st.selectbox(
             "Strategi imputasi untuk fitur numerik",
-            options=["none", "mean", "median"],
+            options=["none", "median"],
             index=0
         )
         if imputer_strategy == "none":
             imputer_strategy = None
 
        # --- Resampler ---
-        resampler = st.selectbox("Resampling method", options=["none", "smoteenn", "smotetomek"])
+        resampler = st.selectbox("Resampling method", options=["none", "smoteenn"])
         if resampler == "none":
             resampler = None
 
         # --- Scaler ---
-        scaler = st.selectbox("Scaler method", options=["none", "robust", "standard"])
+        scaler = st.selectbox("Scaler method", options=["none", "robust"])
         if scaler == "none":
             scaler = None
 
@@ -519,26 +490,23 @@ if halaman == "Pengembangan Model":
                 mime="application/json"
             )
 
-    import io
-    import json
-    import os
-    import tempfile
-
-    if st.checkbox("Validasi model"):
+    if st.checkbox("Modul Validasi model"):
         
         X = st.session_state.get('X_train')
         y = st.session_state.get('y_train')
         
         # Pilihan parameter dari user
+        numeric_features = st.multiselect("Pilih kolom numerik untuk preprocessing", X_train.columns.tolist(), key='num_feats val model')
+        
         algo = st.selectbox("Pilih algoritma", ["xgb", "rf"],key="algovalidasi")
-        imputer_strategy = st.selectbox("Strategi imputasi untuk fitur numerik ", options=["none", "mean", "median"], index=0)
+        imputer_strategy = st.selectbox("Strategi imputasi untuk fitur numerik ", options=["none", "median"], index=0)
         if imputer_strategy == "none":
             imputer_strategy = None
     
         # --- Metode Resampling ---
         resample_type = st.selectbox(
             "Metode Resampling",
-            options=["none", "smote", "smoteenn", "smotetomek"],
+            options=["none", "smoteenn"],
             index=0
         )
         if resample_type == "none":
@@ -547,7 +515,7 @@ if halaman == "Pengembangan Model":
         # --- Skaler ---
         scaler_type = st.selectbox(
             "Scaler Method ",
-            options=["none", "robust", "standard"],
+            options=["none", "robust"],
             index=0
         )
         if scaler_type == "none":
@@ -610,8 +578,8 @@ if halaman == "Pengembangan Model":
                 mime="text/plain"
             )
             
-    if st.checkbox("Bangun model"):
-        from build_model import build_model
+    if st.checkbox("Modul Bangun model"):
+        from module.build_model import build_model
         X_train = st.session_state.X_train
         y_train = st.session_state.y_train
 
@@ -625,14 +593,14 @@ if halaman == "Pengembangan Model":
 
             # Pilih model & konfigurasi
             model_type = st.selectbox("Pilih Algoritma", ['xgb', 'rf'], key ="algo build model")
-            imputer_strategy = st.selectbox("Strategi imputasi untuk fitur numerik ", options=["none", "mean", "median"], index=0, key="imputer build model")
+            imputer_strategy = st.selectbox("Strategi imputasi untuk fitur numerik ", options=["none", "median"], index=0, key="imputer build model")
             if imputer_strategy == "none":
                 imputer_strategy = None
             
            # --- Metode Resampling ---
             resample_type = st.selectbox(
                 "Metode Resampling",
-                options=["none", "smote", "smoteenn", "smotetomek"],
+                options=["none", "smoteenn"],
                 index=0, key="resample build model"
             )
             if resample_type == "none":
@@ -641,7 +609,7 @@ if halaman == "Pengembangan Model":
             # --- Skaler ---
             scaler_type = st.selectbox(
                 "Scaler Method ",
-                options=["none", "robust", "standard"],
+                options=["none", "robust"],
                 index=0, key="scaler build model"
             )
             if scaler_type == "none":
@@ -697,8 +665,8 @@ if halaman == "Pengembangan Model":
                             model_bytes = f.read()
                         st.download_button("⬇️ Download Model", model_bytes, file_name=model_path, mime="application/octet-stream")
 
-    if st.checkbox("Testing"):
-        from test import evaluate_model  
+    if st.checkbox("Modul Uji Model"):
+        from module.test import evaluate_model  
         import pickle
         import os
         import io
@@ -762,165 +730,35 @@ if halaman == "Pengembangan Model":
                         mime="image/png"
                     )
 
-            # Tampilkan ROC Curve jika ada
-            roc_path = os.path.join("output", "roc_curve.png")
-            if os.path.exists(roc_path):
-                with open(roc_path, "rb") as img:
-                    st.image(img.read(), caption="ROC Curve", use_container_width=True)
-                    st.download_button(
-                        label="📥 Download ROC Curve (.png)",
-                        data=img,
-                        file_name="roc_curve.png",
-                        mime="image/png"
-                    )
+    
 
-    if st.button("session"):
-        for key, value in st.session_state.items():
-            st.write(f"{key}: {value}")
-            if(key=="trained_model"):
-                st.write(st.session_state["trained_model"].named_steps['model'].get_params())
-        import sklearn
-        import imblearn
-        import numpy as np
-
-        st.write("scikit-learn:", sklearn.__version__)
-        st.write("imb:", imblearn.__version__)
-        st.write("np:", np.__version__)
-
-
-                
-
-
-
-elif halaman == "Beranda":
-    st.title("Prediksi Potensi Tsunami dengan algoritma XGBoost")
-    st.write("Masukkan parameter gempa bumi untuk prediksi:")
-
-    # Input features with safe_float_input
-    mag = safe_float_input("Magnitudo", "5.0")
-    nst = safe_float_input("NST", "30")
-    longitude = safe_float_input("Longitude", "100")
-    latitude = safe_float_input("Latitude", "0")
-    depth = safe_float_input("Depth", "10")
-    sig = safe_float_input("Significance", "100")
-    cdi = safe_float_input("CDI", "3")
-    mmi = safe_float_input("MMI", "3")
-    rms = safe_float_input("RMS", "0.5")
-    gap = safe_float_input("Gap", "1")
-    dmin = safe_float_input("DMIN", "1")
-    felt = safe_float_input("Felt", "200")
-    magType = st.text_input("Tipe Magnitudo", "mw")
-    location = st.text_input("Lokasi", "Indonesia")
-
-    # If location is empty, use reverse geocoding to fill it
-    if not location:
-        location = get_location(latitude, longitude, 0)
-    # Prepare input_cats with all features (magType,  location)
-    input_cats = pd.DataFrame([[magType, location]], columns=['magType', 'location'])
-    encoded_cats = encoder.transform(input_cats)
-
-    # Handle negative depth
-    if depth < 0:
-        depth = 18.4599990844727  # Median value based on X_train
-
-    # Process the sources input
-    sources_input = st.text_input("Sources (pisahkan dengan koma, contoh: ax,us,tx)", value="ax,us")
-    if sources_input.strip() == "":
-        source_counter = np.nan
-    else:
-        sources_list = [s.strip() for s in sources_input.split(',') if s.strip()]
-        source_counter = len(sources_list)
-
-    # Prepare input for prediction (including encoded magType and location)
-    input_dict = {
-        'mag': mag,
-        'source_counter': source_counter,
-        'nst': nst,
-        'location': location,
-        'longitude': longitude,
-        'dmin': dmin,
-        'mmi': mmi,
-        'latitude': latitude,
-        'magType': magType,
-        'depth': depth,
-        'sig': sig,
-        'cdi': cdi,
-        'rms': rms,
-        'felt': felt,
-        'gap': gap
-    }
-
-    encoded_input = pd.DataFrame([input_dict])
-    # Assign encoded values to magType and location
-    encoded_input[['magType', 'location']] = encoded_cats[:, [0, 1]]  # Use encoded magType and location
-
-
-    # Predict when the button is pressed
-    if st.button("Prediksi"):
-        pred = model.predict(encoded_input)
-        st.write("Hasil Prediksi:", int(pred[0]))
-        if(int(pred[0])==1):
-            st.write("Gempa berpotensi menyebabkan Tsunami")
-        else:
-            st.write("Gempa tidak berpotensi Tsunami")
-        
-        map_df = pd.DataFrame({'lat': [latitude], 'lon': [longitude]})
-        st.subheader("Lokasi Gempa di Peta")
-        layer = pdk.Layer(
-            "ScatterplotLayer",
-            data=map_df,
-            get_position='[lon, lat]',
-            get_color='[255, 0, 0, 160]',
-            get_radius=10000,
-        )
-
-        # State tampilan awal peta
-        view_state = pdk.ViewState(
-            latitude=latitude,
-            longitude=longitude,
-            zoom=6,
-            pitch=0,
-        )
-
-        # Tampilan satelit
-        st.pydeck_chart(pdk.Deck(
-            map_style="mapbox://styles/mapbox/satellite-v9",  
-            initial_view_state=view_state,
-            layers=[layer]
-        ))
-
-    # Show data to user
-    st.subheader("\nData yang Dikirim ke Model:")
-    st.write(encoded_input)
 elif halaman == "Panduan":
-    st.title("Panduan Input Parameter Gempa Bumi")
-    st.write("Berikut adalah deskripsi dari masing-masing parameter yang digunakan untuk memproses data gempa:")
+    st.title("Panduan Input Modul Pengembangan Model Klasifikasi Potensi Tsunami berdasarkan Gempa Bumi")
+    st.write("Berikut adalah deskripsi dari masing-masing modul:")
 
-    st.markdown("### Daftar Parameter:")
+    st.markdown("### Daftar Modul:")
     st.markdown("""
-    - **magnitudo**: Magnitudo gempa yang menunjukkan kekuatan gempa (contoh: `5.6`).
-    - **nst**: Jumlah stasiun seismik yang digunakan untuk menghitung lokasi gempa.
-    - **longitude**: Koordinat geografis garis bujur tempat gempa terjadi.
-    - **latitude**: Koordinat geografis garis lintang tempat gempa terjadi.
-    - **depth**: Kedalaman pusat gempa dalam kilometer.
-    - **Significance**: Signifikansi dari gempa (nilai semakin tinggi, semakin signifikan).
-    - **cdi**: Community Internet Intensity – rata-rata dari laporan masyarakat.
-    - **mmi**: Indikator intensitas gempa yang dirasakan (Modified Mercalli Intensity).
-    - **rms**: Root mean square dari sinyal gempa, menggambarkan kekuatan getaran.
-    - **gap**: Sudut maksimum antara stasiun yang mencatat gempa terhadap pusat gempa.
-    - **dmin**: Jarak minimum dari lokasi kejadian ke stasiun pencatat dalam derajat.
-    - **felt**: Jumlah laporan dari orang yang merasakan gempa.
-    - **Tipe Magnitudo**: Jenis skala magnitudo yang digunakan, seperti `mb`, `ml`, `mw`.
-    - **lokasi**: Deskripsi lokasi terjadinya gempa (misalnya nama negara atau laut, contoh : Indonesia).
-    - **sources**: sumber yang mencatat kejadian gempa (contoh: ax,tx).
+    - **Modul Eksplorasi Data** : merupakan modul yang berfungsi untuk membantu pengguna dalam menganalisis data. Modul ini dapat memvisualisasikan karakteristik data seperti missing value, outlier, distribusi kelas, korelasi numerik, dan data duplikat.
+    
+    - **Modul source_counter** : merupakan modul preprocessing yang berfungsi untuk menghitung jumlah sumber data gempa yang berasal dari kolom sumber gempa.
+    
+    - **Modul Geocoding** : merupakan modul preprocessing yang berfungsi untuk mengubah data koordinat ke dalam nama negara atau lokasi. Modul ini menggunakan API dari OpenCage untuk melakukan reverse geocoding. 
+    
+    - **Modul Encoding** : merupakan modul preprocessing yang berfungsi untuk mengubah data yang berbentuk kategori kedalam bentuk numerik. Encoding dapat dilakukan menggunakan ordinal encoder atau label encoder.
+    
+    - **Modul Feature Selection** : merupakan modul preprocessing yang berfungsi untuk mengurangi fitur yang tidak memberikan kontribusi kepada model. Feature selection dilakukan menggunakan feature importance dari algoritma XGBoost atau Random Forest. 
+    
+    - **Modul Hyperparameter Tuning** : merupakan modul yang berfungsi untuk mencari hyperparameter terbaik untuk membangun model. Proses ini menggunakan teknik Bayesian Optimization untuk mencari kombinasi hyperparameter yang optimal. Pengguna dapat mengatur fitur numerik untuk preprocessing hingga jumlah iterasi yang dilakukan.
+    
+    - **Modul Validasi** : merupakan modul yang berfungsi untuk memvalidasi model menggunakan Stratified K-Fold Cross Validation. Hasil validasi divisualisasikan dalam bentuk gambar skor F1 tiap kelas per fold.
+    
+    - **Modul Bangun Model** : merupakan modul yang berfungsi untuk membangun model sesuai dengan preprocessing yang diinginkan. Fungsi ini dapat membangun model XGBoost atau Random Forest berdasarkan parameter terbaik yang sudah didapatkan sebelumnya dan dapat menyimpan model untuk diuji.
+    
+    - **Modul Uji Model** : merupakan modul yang berfungsi untuk menguji model yang telah dibangun. Modul ini menerima masukan berupa model dan data pengujian dan mengembalikan hasil berupa classification report dan confusion matrix.
+    
     """)
 
-    # Penjelasan tambahan jika ada format khusus
-    st.markdown("### 🔍 Catatan Format:")
-    st.write("- Parameter seperti `magnitudo`, `nst`, dan lainnya bisa disediakan dalam bentuk numerik (float atau int), sesuai dengan konteks input data.")
-    st.write("- Parameter `location`, `Tipe Magnitudo`, dan `sources` harus berupa teks/string.")
-    st.write("Kategori yang telah dipelajari oleh encoder:")
-    for i, cats in enumerate(encoder.categories_):
-        st.write(f"Kolom {i}: {cats}")
-    st.write("\n- Harap menghubungi surel D1041211020@student.untan.ac.id bila terdapat kritik dan saran.")
-    
+    st.markdown("### Catatan :")
+    st.write("- Gunakan input berformat csv atau pickle")
+    st.write("- Resampling dengan data yang memiliki missing value akan menyebabkan error")
+    st.write("\n- Harap menghubungi melalui email D1041211020@student.untan.ac.id bila terdapat pertanyaan, kritik atau saran.")

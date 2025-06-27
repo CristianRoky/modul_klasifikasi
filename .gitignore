@@ -1,0 +1,23 @@
+# Folder & file sementara
+__pycache__/
+*.pyc
+
+# Dataset lokal
+storage/
+*.xlsx
+
+# Environment file
+.env
+*.env
+
+# Output model dan hasil evaluasi
+models/
+*.pkl
+*.joblib
+
+# Editor config (opsional)
+.vscode/
+.idea/
+
+# Notebook checkpoints
+.ipynb_checkpoints/

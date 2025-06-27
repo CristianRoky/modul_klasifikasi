@@ -1,7 +1,15 @@
+import sys
+from pathlib import Path
+
+# Set path ke parent folder
+root_path = Path(__file__).parent.parent
+sys.path.append(str(root_path))
+
+
 import pytest
 import pandas as pd
 from unittest.mock import patch, MagicMock
-from geocoding import create_location
+from module.geocoding import create_location
 
 @pytest.fixture
 def sample_df():
@@ -24,7 +32,7 @@ def test_create_location_with_mocked_geocoder(tmp_path, sample_df, fake_geocoder
     cache_file = tmp_path / "cache.json"
     cache_file.write_text("{}")
 
-    with patch("geocoding.OpenCageGeocode", side_effect=lambda key: fake_geocoder[0]):
+    with patch("module.geocoding.OpenCageGeocode", side_effect=lambda key: fake_geocoder[0]):
         result_df = create_location(
             df=sample_df,
             api_keys=["dummy_key"],
@@ -41,7 +49,7 @@ def test_create_location_with_existing_cache(tmp_path, sample_df):
     cache_file = tmp_path / "cache.json"
     cache_file.write_text(str(cache).replace("'", '"'))
 
-    with patch("geocoding.OpenCageGeocode"):
+    with patch("module.geocoding.OpenCageGeocode"):
         result_df = create_location(
             df=sample_df,
             api_keys=["dummy_key"],
@@ -61,7 +69,7 @@ def test_create_location_with_nan_coordinates(tmp_path):
     cache_file = tmp_path / "cache.json"
     cache_file.write_text("{}")
 
-    with patch("geocoding.OpenCageGeocode"):
+    with patch("module.geocoding.OpenCageGeocode"):
         result_df = create_location(
             df=df,
             api_keys=["dummy_key"],

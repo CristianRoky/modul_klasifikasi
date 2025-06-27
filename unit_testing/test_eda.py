@@ -1,9 +1,16 @@
+import sys
+from pathlib import Path
+
+# Set path ke parent folder
+root_path = Path(__file__).parent.parent
+sys.path.append(str(root_path))
+
 import pandas as pd
 import numpy as np
 import os
 import shutil
 import pytest
-from exploratory_data_analysis import eda_summary  # sesuaikan nama file modulmu
+from module.exploratory_data_analysis import eda_summary  # sesuaikan nama file modulmu
 
 @pytest.fixture
 def sample_df():
@@ -25,7 +32,7 @@ def clean_eda_output():
         shutil.rmtree(dir_path)
 
 def test_eda_summary_basic(sample_df, clean_eda_output):
-    results = eda_summary(sample_df, label_column='label', save_dir="eda_output")
+    results = eda_summary(sample_df, label_column='label',y_train=sample_df['label'], save_dir="eda_output")
 
     # 1. Missing values
     assert isinstance(results['missing'], dict) or results['missing'] is None

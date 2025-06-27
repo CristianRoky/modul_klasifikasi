@@ -4,10 +4,10 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import RobustScaler, StandardScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.compose import ColumnTransformer
 from imblearn.pipeline import Pipeline as Pipeline
-from imblearn.combine import SMOTEENN, SMOTETomek
+from imblearn.combine import SMOTEENN
 from sklearn.metrics import f1_score, classification_report
 import numpy as np
 import json
@@ -34,7 +34,7 @@ def validate_model(
 
     # --- Preprocessing (hanya jika semua komponen diberikan) ---
     if numeric_features and imputer_strategy and scaler_type:
-        scaler_cls = RobustScaler if scaler_type == "robust" else StandardScaler
+        scaler_cls = RobustScaler
         numeric_transformer = Pipeline(steps=[
             ('imputer', SimpleImputer(strategy=imputer_strategy)),
             ('scaler', scaler_cls())
@@ -48,8 +48,6 @@ def validate_model(
     # --- Resampler (jika diberikan) ---
     if resampler_type == "smoteenn":
         resampler_obj = SMOTEENN(random_state=random_state)
-    elif resampler_type == "smotetomek":
-        resampler_obj = SMOTETomek(random_state=random_state)
     else:
         resampler_obj = None
 
@@ -60,7 +58,6 @@ def validate_model(
         model = XGBClassifier(
             random_state=random_state,
             verbosity=0,
-            use_label_encoder=False,
             eval_metric='logloss',
             **best_params
         )
@@ -131,6 +128,5 @@ def validate_model(
     plt.xticks(df_plot.index)
     plt.tight_layout()
     plt.savefig(save_plot_path, dpi=300)
-    plt.show()
-
+    
     return df_f1

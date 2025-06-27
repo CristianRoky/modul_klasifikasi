@@ -1,29 +1,29 @@
 import pickle
 import os
 import pandas as pd
-from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder
+from sklearn.preprocessing import OrdinalEncoder, LabelEncoder
 from sklearn.impute import SimpleImputer
 
 def encode(
     X_train: pd.DataFrame,
     columns: list,
     X_test: pd.DataFrame = None,
-    method: str = "ordinal",  # pilihan: "ordinal" atau "onehot"
+    method: str = "ordinal",  
     prefix: str = "encoder",
     save_path: str = ".",
-    save_encoded: bool = False
+    save_encoded: bool = False,
+    save_encoder: bool = True
 ):
     """
-    Encode kolom kategorikal dengan metode yang dipilih, handle missing, dan simpan encoder.
-
     Parameters:
     - X_train: DataFrame training
     - columns: list nama kolom yang ingin di-encode
     - X_test: DataFrame testing (opsional)
-    - method: "ordinal" atau "onehot"
+    - method: "ordinal"
     - prefix: prefix nama file encoder yang akan disimpan
     - save_path: path untuk menyimpan file encoder dan hasil encoded
     - save_encoded: jika True, simpan hasil encoded ke file CSV
+    - save_encoder: jika True, encoder disimpan dalam bentuk pickle
 
     Returns:
     - X_train_encoded: DataFrame hasil encoding
@@ -36,29 +36,20 @@ def encode(
     os.makedirs(save_path, exist_ok=True)
 
     for col in columns:
-        # Imputer untuk missing values (isi missing dengan string 'missing')
-        
         if method == "ordinal":
             encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
             X_train_encoded[[col]] = encoder.fit_transform(X_train_encoded[[col]])
             if X_test_encoded is not None:
                 X_test_encoded[[col]] = encoder.transform(X_test_encoded[[col]])
-        elif method == "onehot":
-            encoder = OneHotEncoder(handle_unknown="ignore", sparse=False)
-            # Fit transform untuk train
-            encoded_train = encoder.fit_transform(X_train_encoded[[col]])
-            encoded_cols = [f"{col}_{cat}" for cat in encoder.categories_[0]]
-
-            encoded_train_df = pd.DataFrame(encoded_train, columns=encoded_cols, index=X_train_encoded.index)
-            X_train_encoded = X_train_encoded.drop(columns=[col]).join(encoded_train_df)
-
-            if X_test_encoded is not None:
-                encoded_test = encoder.transform(X_test_encoded[[col]])
-                encoded_test_df = pd.DataFrame(encoded_test, columns=encoded_cols, index=X_test_encoded.index)
-                X_test_encoded = X_test_encoded.drop(columns=[col]).join(encoded_test_df)
         else:
-            raise ValueError("Metode encoding hanya 'ordinal' atau 'onehot'")
+            raise ValueError("Metode encoding hanya 'ordinal'")
 
+        # Save encoder
+        if save_encoder:
+            with open(os.path.join(save_path, f"{prefix}_{col}_encoder.pkl"), 'wb') as f:
+                pickle.dump(encoder, f)
+
+    # Save encoded datasets if requested
     if save_encoded:
         X_train_encoded.to_csv(os.path.join(save_path, f"{prefix}_X_train_encoded.csv"), index=False)
         if X_test_encoded is not None:
