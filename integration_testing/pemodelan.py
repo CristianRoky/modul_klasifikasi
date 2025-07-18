@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-# Set path ke parent folder
+# Set path ke folder parent
 root_path = Path(__file__).parent.parent
 sys.path.append(str(root_path))
 
@@ -27,6 +27,10 @@ class TestModelPipelineIntegration(unittest.TestCase):
         )
 
     def test_tuning_validation_build(self):
+        """
+        Pengujian ini bertujuan untuk memastikan proses hyperparameter tuning,
+        validasi model, dan pembangunan model akhir berjalan dengan baik.
+        """
         # Step 1: Tuning
         best_params = tune_model(
             X_train=self.X_train,
@@ -57,7 +61,6 @@ class TestModelPipelineIntegration(unittest.TestCase):
             cv_splits=3,
             save_plot_path="output_it"
         )
-       
         self.assertIn("F1_0", val_result)
         self.assertGreaterEqual(val_result["F1_0"].iloc[0], 0)
 
@@ -70,12 +73,30 @@ class TestModelPipelineIntegration(unittest.TestCase):
             best_param_path="test_best_params.pkl",
             imputer_strategy=None,
             resample_type=None,
-            save_model=False  # True jika ingin menyimpan
+            save_model=False
         )
         self.assertTrue(hasattr(model, "fit"))
 
+    def test_build_model_without_tuning(self):
+        """
+        Pengujian ini dilakukan untuk memastikan model dapat dibangun
+        dan diuji tanpa melibatkan proses hyperparameter tuning.
+        """
+        # Gunakan parameter default/manual
+        model = build_model(
+            X_train=self.X_train,
+            y_train=self.y_train,
+            numeric_features=None,
+            model_type="xgb",
+            model_params={"max_depth": 2, "learning_rate": 0.1},
+            imputer_strategy=None,
+            resample_type=None,
+            save_model=False
+        )
+        self.assertTrue(hasattr(model, "predict"))
+
     def tearDown(self):
-        # Bersihkan file parameter jika dibuat
+        # Hapus file parameter tuning jika dibuat
         if os.path.exists("test_best_params.pkl"):
             os.remove("test_best_params.pkl")
 

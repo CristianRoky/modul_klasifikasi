@@ -1,3 +1,10 @@
+import sys
+from pathlib import Path
+
+# Set path ke folder parent
+root_path = Path(__file__).parent.parent
+sys.path.append(str(root_path))
+
 import unittest
 from integration_testing.main_pipeline import run_pipeline  # Fungsi ini harus memanggil ke-9 modul, dan return model + data
 from module.test import evaluate_model  # Asumsinya evaluasi terpisah di modul test/
