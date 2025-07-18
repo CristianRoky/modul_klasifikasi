@@ -87,7 +87,7 @@ def validate_model(
         macro_f1 = f1_score(y_test, y_pred, average='macro')
 
         # Detail per kelas
-        report = classification_report(y_test, y_pred, output_dict=True)
+        report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
         f1_scores = {
             'fold': fold_num,
             'macro_f1': macro_f1
@@ -127,6 +127,7 @@ def validate_model(
     plt.legend(title='Kelas')
     plt.xticks(df_plot.index)
     plt.tight_layout()
-    plt.savefig(save_plot_path, dpi=300)
+    if save_plot_path is not None:
+        plt.savefig(save_plot_path, dpi=300)
     
     return df_f1

@@ -31,7 +31,7 @@ def evaluate_model(
 
     print("\n===== Evaluasi Akhir pada Test Set =====")
     acc = accuracy_score(y_test, y_pred)
-    report = classification_report(y_test, y_pred)
+    report = classification_report(y_test, y_pred, zero_division=0)
     print("Accuracy:", acc)
     print("Classification Report:\n", report)
 

@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import pickle
 
-from xgboost import XGBRegressor
-from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 def feature_selection_based_on_feature_importance(
     X_train, y_train,
@@ -34,9 +34,9 @@ def feature_selection_based_on_feature_importance(
 
     # Buat dan train model sesuai algo
     if algo == 'xgb':
-        model = XGBRegressor()
+        model = XGBClassifier()
     elif algo == 'rf':
-        model = RandomForestRegressor()
+        model = RandomForestClassifier()
     else:
         raise ValueError("algo harus 'xgb' atau 'rf'")
 
